@@ -1,0 +1,55 @@
+# This script downloads RNA-seq expression data and clinical
+# data for The Cancer Genome Atlas Ovarian Cancer (TCGA-OV)
+# project using the TCGAbiolinks R package
+
+# Output:  data/TCGA_OV_TPM.csv
+#          data/TCGA_OV_clinical.csv
+
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+if (!require("TCGAbiolinks", quietly = TRUE))
+  BiocManager::install("TCGAbiolinks")
+
+if (!require("SummarizedExperiment", quietly = TRUE))
+  BiocManager::install("SummarizedExperiment")
+
+library(TCGAbiolinks)
+library(SummarizedExperiment)
+
+# Create data directory
+dir.create("data", showWarnings = FALSE)
+
+# ── Download TCGA-OV RNA-seq expression data
+message("Step 1: Querying GDC for TCGA-OV STAR-Counts expression files...")
+
+query <- GDCquery(
+  project = "TCGA-OV",
+  data.category = "Transcriptome Profiling",
+  data.type = "Gene Expression Quantification",
+  workflow.type = "STAR - Counts"
+)
+
+message("Step 2: Downloading expression files")
+GDCdownload(query)
+
+message("Step 3: Preparing expression matrix")
+data <- GDCprepare(query)
+
+# Extract TPM expression matrix
+message("Step 4: Extracting TPM values...")
+expr_matrix <- assay(data, "tpm_unstrand")
+write.csv(expr_matrix, file = "data/TCGA_OV_TPM.csv")
+message(paste("Expression matrix saved:", nrow(expr_matrix), "genes x",
+              ncol(expr_matrix), "samples"))
+
+# Extract and clean clinical data
+message("Step 5: Extracting clinical data...")
+clinical <- as.data.frame(colData(data))
+clinical_clean <- clinical[, !sapply(clinical, is.list)]
+write.csv(clinical_clean, file = "data/TCGA_OV_clinical.csv")
+message(paste("Clinical data saved:", nrow(clinical_clean), "patients x",
+              ncol(clinical_clean), "variables"))
+
+message("\nData download complete.")
+message("Files saved to data/TCGA_OV_TPM.csv and data/TCGA_OV_clinical.csv")

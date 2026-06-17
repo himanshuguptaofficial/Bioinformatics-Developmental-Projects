@@ -1,0 +1,20 @@
+# Datasets, not tracked. Regenerate with: Rscript DownloadDatafromR
+GDCdata/
+data/
+MANIFEST.txt
+
+# R session state
+.RData
+.Rhistory
+.Rapp.history
+*.rds
+
+# Python
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store
+
+# Local audit trail, not part of the project
+command_history.sh
