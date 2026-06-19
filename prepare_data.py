@@ -1,12 +1,16 @@
 """
 Cohort filtering for the TCGA-OV HGSOC analyses
 ===============================================
-Reads the raw TCGA-OV tables and cuts them down to confirmed high-grade serous
-primary tumours with usable follow-up.
+Reads the raw TCGA-OV tables, cuts them down to confirmed high-grade serous
+primary tumours with usable follow-up, and attaches platinum response.
+
+Platinum-free interval is not in the GDC clinical table, so it comes from the
+supplementary table of the TCGA ovarian paper (Nature 2011).
 
 Inputs:
     data/TCGA_OV_TPM.csv        TCGA-OV expression matrix, TPM
     data/TCGA_OV_clinical.csv   TCGA-OV clinical table
+    data/Table_S1_2.xlsx        Platinum-free interval, TCGA Nature 2011
 
 Author: Himanshu Gupta, UC San Diego
 """
@@ -19,10 +23,11 @@ DATA_DIR = "data"
 
 EXPR_PATH = os.path.join(DATA_DIR, "TCGA_OV_TPM.csv")
 CLINICAL_PATH = os.path.join(DATA_DIR, "TCGA_OV_clinical.csv")
+PLATINUM_PATH = os.path.join(DATA_DIR, "Table_S1_2.xlsx")
 
 
 def load_raw():
-    """Read the expression matrix and the clinical table."""
+    """Read the three input files."""
     print("Loading raw data")
     expr = pd.read_csv(EXPR_PATH, index_col=0)
     print(f"  Expression: {expr.shape[0]} genes x {expr.shape[1]} samples")
@@ -30,7 +35,10 @@ def load_raw():
     clinical = pd.read_csv(CLINICAL_PATH, index_col=0)
     print(f"  Clinical:   {len(clinical)} samples x {clinical.shape[1]} variables")
 
-    return expr, clinical
+    platinum = pd.read_excel(PLATINUM_PATH)
+    print(f"  Platinum:   {len(platinum)} patients")
+
+    return expr, clinical, platinum
 
 
 def filter_to_hgsoc(clinical):
@@ -63,12 +71,52 @@ def filter_to_hgsoc(clinical):
     return clinical
 
 
+def assign_tier(pfi_months):
+    """Three-tier platinum response, GCIG consensus definition."""
+    if pfi_months < 6:
+        return "Resistant"
+    if pfi_months <= 12:
+        return "Partially_Sensitive"
+    return "Sensitive"
+
+
+def merge_platinum_status(clinical, platinum):
+    """Attach platinum-free interval and derive the resistance tier."""
+    print("\nMerging platinum resistance status")
+
+    # Expression barcodes look like TCGA-29-1691-01A-01R-1566-13; the platinum
+    # table is keyed on the 12-character patient barcode.
+    clinical = clinical.copy()
+    clinical["patient_id"] = clinical.index.str[:12]
+
+    platinum_clean = platinum[
+        ["BCRPATIENTBARCODE", "PlatinumFreeInterval (mos)*", "PlatinumStatus"]
+    ].copy()
+    platinum_clean.columns = ["patient_id", "PFI_months", "PlatinumStatus"]
+
+    # merge() drops the index, so restore the full barcode afterwards.
+    clinical = clinical.merge(platinum_clean, on="patient_id", how="left")
+    clinical = clinical.set_index("barcode")
+
+    clinical = clinical[clinical["PlatinumStatus"].isin(["Sensitive", "Resistant"])]
+    print(f"  Definitive platinum status:  {len(clinical)}")
+
+    clinical["resistance_tier"] = clinical["PFI_months"].apply(assign_tier)
+    return clinical
+
+
 def main():
-    expr, clinical = load_raw()
+    expr, clinical, platinum = load_raw()
+
     clinical = filter_to_hgsoc(clinical)
+    clinical = merge_platinum_status(clinical, platinum)
 
     matched = [s for s in clinical.index if s in expr.columns]
     print(f"\nPatients with expression data: {len(matched)}")
+
+    tiers = clinical["resistance_tier"].value_counts()
+    for tier in ["Resistant", "Partially_Sensitive", "Sensitive"]:
+        print(f"  {tier:<20} {tiers.get(tier, 0)}")
 
 
 if __name__ == "__main__":
