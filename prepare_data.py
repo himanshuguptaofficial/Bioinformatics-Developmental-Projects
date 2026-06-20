@@ -1,29 +1,35 @@
 """
-Cohort filtering for the TCGA-OV HGSOC analyses
-===============================================
-Reads the raw TCGA-OV tables, cuts them down to confirmed high-grade serous
-primary tumours with usable follow-up, and attaches platinum response.
-
-Platinum-free interval is not in the GDC clinical table, so it comes from the
-supplementary table of the TCGA ovarian paper (Nature 2011).
+Shared preprocessing for the TCGA-OV HGSOC analyses
+===================================================
+Builds the derived matrices that the project scripts read. Run this once after
+downloading the raw data.
 
 Inputs:
     data/TCGA_OV_TPM.csv        TCGA-OV expression matrix, TPM
     data/TCGA_OV_clinical.csv   TCGA-OV clinical table
     data/Table_S1_2.xlsx        Platinum-free interval, TCGA Nature 2011
 
+Outputs:
+    data/derived/clinical_hgsoc_filtered.csv   216 patients, survival + tier
+    data/derived/expr_hgsoc_filtered.csv       all genes, log2(TPM+1)
+
 Author: Himanshu Gupta, UC San Diego
 """
 
 import os
 
+import numpy as np
 import pandas as pd
 
 DATA_DIR = "data"
+DERIVED_DIR = os.path.join(DATA_DIR, "derived")
 
 EXPR_PATH = os.path.join(DATA_DIR, "TCGA_OV_TPM.csv")
 CLINICAL_PATH = os.path.join(DATA_DIR, "TCGA_OV_clinical.csv")
 PLATINUM_PATH = os.path.join(DATA_DIR, "Table_S1_2.xlsx")
+
+# A gene must be expressed in at least this fraction of patients to be kept.
+MIN_EXPRESSED_FRACTION = 0.2
 
 
 def load_raw():
@@ -105,18 +111,60 @@ def merge_platinum_status(clinical, platinum):
     return clinical
 
 
+def add_survival_variables(clinical):
+    """Build overall-survival time, event indicator, and age in years."""
+    clinical = clinical.copy()
+
+    # Dead patients contribute time to death; the rest are censored at last
+    # follow-up.
+    clinical["os_time"] = clinical["days_to_death"].fillna(
+        clinical["days_to_last_follow_up"]
+    )
+    clinical["os_event"] = (clinical["vital_status"] == "Dead").astype(int)
+    clinical["age_years"] = clinical["age_at_diagnosis"] / 365.25
+
+    return clinical
+
+
+def normalize_and_filter(expr, sample_ids):
+    """Match samples, apply log2(TPM+1), and drop low-expression genes."""
+    print("\nNormalizing expression")
+
+    matched = [s for s in sample_ids if s in expr.columns]
+    expr = expr[matched]
+    print(f"  Matched samples:             {len(matched)}")
+
+    expr_log = np.log2(expr + 1)
+
+    min_patients = int(MIN_EXPRESSED_FRACTION * expr_log.shape[1])
+    keep = (expr_log > 0).sum(axis=1) >= min_patients
+    expr_log = expr_log[keep]
+    print(f"  Genes after low-expr filter: {expr_log.shape[0]}")
+
+    return expr_log, matched
+
+
 def main():
+    os.makedirs(DERIVED_DIR, exist_ok=True)
+
     expr, clinical, platinum = load_raw()
 
     clinical = filter_to_hgsoc(clinical)
     clinical = merge_platinum_status(clinical, platinum)
+    clinical = add_survival_variables(clinical)
 
-    matched = [s for s in clinical.index if s in expr.columns]
-    print(f"\nPatients with expression data: {len(matched)}")
+    expr_log, matched = normalize_and_filter(expr, clinical.index.tolist())
+    clinical = clinical.loc[matched]
 
+    print("\nWriting derived files")
+    clinical.to_csv(os.path.join(DERIVED_DIR, "clinical_hgsoc_filtered.csv"))
+    expr_log.to_csv(os.path.join(DERIVED_DIR, "expr_hgsoc_filtered.csv"))
+
+    print(f"\nFinal cohort: {len(clinical)} patients")
     tiers = clinical["resistance_tier"].value_counts()
     for tier in ["Resistant", "Partially_Sensitive", "Sensitive"]:
         print(f"  {tier:<20} {tiers.get(tier, 0)}")
+    print(f"Deaths observed: {clinical['os_event'].sum()}")
 
 
 if __name__ == "__main__":
