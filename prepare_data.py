@@ -1,21 +1,25 @@
 """
-Shared preprocessing for the TCGA-OV HGSOC analyses
-===================================================
-Builds the derived matrices that the project scripts read. Run this once after
-downloading the raw data.
+Shared preprocessing for all four analyses
+==========================================
+Builds the derived matrices that every project in this repository reads.
+Run this once after downloading the raw data; the four project scripts then
+run in seconds instead of repeating this cascade.
 
-Inputs:
+Inputs (see README for how to obtain each):
     data/TCGA_OV_TPM.csv        TCGA-OV expression matrix, TPM
     data/TCGA_OV_clinical.csv   TCGA-OV clinical table
     data/Table_S1_2.xlsx        Platinum-free interval, TCGA Nature 2011
+    data/gencode.v44.gtf.gz     GENCODE v44 annotation
 
 Outputs:
     data/derived/clinical_hgsoc_filtered.csv   216 patients, survival + tier
     data/derived/expr_hgsoc_filtered.csv       all genes, log2(TPM+1)
+    data/derived/expr_lncrna_final.csv         lncRNAs only, log2(TPM+1)
 
 Author: Himanshu Gupta, UC San Diego
 """
 
+import gzip
 import os
 
 import numpy as np
@@ -27,13 +31,14 @@ DERIVED_DIR = os.path.join(DATA_DIR, "derived")
 EXPR_PATH = os.path.join(DATA_DIR, "TCGA_OV_TPM.csv")
 CLINICAL_PATH = os.path.join(DATA_DIR, "TCGA_OV_clinical.csv")
 PLATINUM_PATH = os.path.join(DATA_DIR, "Table_S1_2.xlsx")
+GTF_PATH = os.path.join(DATA_DIR, "gencode.v44.gtf.gz")
 
 # A gene must be expressed in at least this fraction of patients to be kept.
 MIN_EXPRESSED_FRACTION = 0.2
 
 
 def load_raw():
-    """Read the three input files."""
+    """Read the four input files."""
     print("Loading raw data")
     expr = pd.read_csv(EXPR_PATH, index_col=0)
     print(f"  Expression: {expr.shape[0]} genes x {expr.shape[1]} samples")
@@ -144,6 +149,51 @@ def normalize_and_filter(expr, sample_ids):
     return expr_log, matched
 
 
+def load_lncrna_ids(gtf_path):
+    """Collect Ensembl gene IDs annotated as lncRNA in GENCODE."""
+    print("\nExtracting lncRNAs from GENCODE v44")
+
+    lncrna_ids = set()
+    with gzip.open(gtf_path, "rt") as handle:
+        for line in handle:
+            if line.startswith("#"):
+                continue
+            fields = line.rstrip("\n").split("\t")
+            if len(fields) < 9 or fields[2] != "gene":
+                continue
+
+            gene_type, gene_id = "", ""
+            for attr in fields[8].split(";"):
+                attr = attr.strip()
+                if attr.startswith("gene_type"):
+                    gene_type = attr.split('"')[1]
+                elif attr.startswith("gene_id"):
+                    gene_id = attr.split('"')[1]
+
+            if gene_type == "lncRNA" and gene_id:
+                lncrna_ids.add(gene_id)
+
+    print(f"  lncRNA genes in GENCODE:     {len(lncrna_ids)}")
+    return lncrna_ids
+
+
+def extract_lncrnas(expr_log, lncrna_ids):
+    """Subset the matrix to lncRNAs, matching on unversioned Ensembl IDs."""
+    # GENCODE and TCGA both carry version suffixes but not always the same one.
+    lncrna_base = {gene_id.split(".")[0] for gene_id in lncrna_ids}
+    expr_base = expr_log.index.str.split(".").str[0]
+    expr_lncrna = expr_log[expr_base.isin(lncrna_base)]
+
+    # Re-apply the low-expression filter within the lncRNA subset, which is
+    # sparser than the transcriptome as a whole.
+    min_patients = int(MIN_EXPRESSED_FRACTION * expr_lncrna.shape[1])
+    keep = (expr_lncrna > 0).sum(axis=1) >= min_patients
+    expr_lncrna = expr_lncrna[keep]
+
+    print(f"  lncRNAs retained:            {expr_lncrna.shape[0]}")
+    return expr_lncrna
+
+
 def main():
     os.makedirs(DERIVED_DIR, exist_ok=True)
 
@@ -156,15 +206,20 @@ def main():
     expr_log, matched = normalize_and_filter(expr, clinical.index.tolist())
     clinical = clinical.loc[matched]
 
+    lncrna_ids = load_lncrna_ids(GTF_PATH)
+    expr_lncrna = extract_lncrnas(expr_log, lncrna_ids)
+
     print("\nWriting derived files")
     clinical.to_csv(os.path.join(DERIVED_DIR, "clinical_hgsoc_filtered.csv"))
     expr_log.to_csv(os.path.join(DERIVED_DIR, "expr_hgsoc_filtered.csv"))
+    expr_lncrna.to_csv(os.path.join(DERIVED_DIR, "expr_lncrna_final.csv"))
 
     print(f"\nFinal cohort: {len(clinical)} patients")
     tiers = clinical["resistance_tier"].value_counts()
     for tier in ["Resistant", "Partially_Sensitive", "Sensitive"]:
         print(f"  {tier:<20} {tiers.get(tier, 0)}")
     print(f"Deaths observed: {clinical['os_event'].sum()}")
+    print(f"lncRNAs x patients: {expr_lncrna.shape[0]} x {expr_lncrna.shape[1]}")
 
 
 if __name__ == "__main__":
