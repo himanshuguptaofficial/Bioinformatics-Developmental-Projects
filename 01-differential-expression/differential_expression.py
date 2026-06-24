@@ -5,7 +5,8 @@ Biological question: which lncRNAs are expressed differently at diagnosis
 between patients who go on to become platinum-resistant and those who remain
 platinum-sensitive?
 
-Method: Mann-Whitney U per lncRNA, resistant against sensitive.
+Method: Mann-Whitney U per lncRNA, Benjamini-Hochberg FDR correction.
+Output: a ranked table of every lncRNA tested.
 
 Run prepare_data.py first.
 
@@ -16,8 +17,10 @@ import os
 
 import pandas as pd
 from scipy.stats import mannwhitneyu
+from statsmodels.stats.multitest import multipletests
 
 DERIVED_DIR = os.path.join("..", "data", "derived")
+RESULT_DIR = "results"
 
 
 def load_data():
@@ -57,31 +60,55 @@ def run_differential_expression(expr, clinical):
     # fold change.
     fold_changes = resistant_expr.mean(axis=1) - sensitive_expr.mean(axis=1)
 
+    _, adj_pvalues, _, _ = multipletests(pvalues, method="fdr_bh")
+
     results = pd.DataFrame(
         {
             "gene_id": expr.index,
             "log2_fold_change": fold_changes,
             "pvalue": pvalues,
+            "adj_pvalue": adj_pvalues,
         }
     ).sort_values("pvalue")
 
     return results
 
 
-def main():
-    expr, clinical = load_data()
-    results = run_differential_expression(expr, clinical)
+def summarize(results):
+    n_raw = int((results["pvalue"] < 0.05).sum())
+    n_fdr = int((results["adj_pvalue"] < 0.05).sum())
+    n_up = int(((results["pvalue"] < 0.05) & (results["log2_fold_change"] > 0)).sum())
+    n_down = int(((results["pvalue"] < 0.05) & (results["log2_fold_change"] < 0)).sum())
 
     print(f"\nTested:                    {len(results)}")
-    print(f"Significant at raw p<0.05: {int((results['pvalue'] < 0.05).sum())}")
+    print(f"Significant at raw p<0.05: {n_raw}")
+    print(f"  Up in resistant:         {n_up}")
+    print(f"  Down in resistant:       {n_down}")
+    print(f"Significant after FDR:     {n_fdr}")
+    print(f"Smallest adjusted p-value: {results['adj_pvalue'].min():.4f}")
 
     print("\nTop 10 candidates:")
-    for _, row in results.head(10).iterrows():
+    top = results.head(10)
+    for _, row in top.iterrows():
         direction = "up" if row["log2_fold_change"] > 0 else "down"
         print(
             f"  {row['gene_id']:<20} log2FC={row['log2_fold_change']:+.3f} "
             f"({direction} in resistant)  p={row['pvalue']:.2e}"
         )
+
+    return n_up, n_down
+
+
+def main():
+    os.makedirs(RESULT_DIR, exist_ok=True)
+
+    expr, clinical = load_data()
+    results = run_differential_expression(expr, clinical)
+    summarize(results)
+
+    result_path = os.path.join(RESULT_DIR, "de_results.csv")
+    results.to_csv(result_path, index=False)
+    print(f"Saved {result_path}")
 
 
 if __name__ == "__main__":
