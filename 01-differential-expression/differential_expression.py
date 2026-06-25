@@ -6,7 +6,7 @@ between patients who go on to become platinum-resistant and those who remain
 platinum-sensitive?
 
 Method: Mann-Whitney U per lncRNA, Benjamini-Hochberg FDR correction.
-Output: a ranked table of every lncRNA tested.
+Output: volcano plot, plus a ranked table of every lncRNA tested.
 
 Run prepare_data.py first.
 
@@ -15,11 +15,14 @@ Author: Himanshu Gupta, UC San Diego
 
 import os
 
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from scipy.stats import mannwhitneyu
 from statsmodels.stats.multitest import multipletests
 
 DERIVED_DIR = os.path.join("..", "data", "derived")
+FIGURE_DIR = "figures"
 RESULT_DIR = "results"
 
 
@@ -99,7 +102,50 @@ def summarize(results):
     return n_up, n_down
 
 
+def plot_volcano(results, resistant_n, sensitive_n):
+    """Volcano plot of effect size against significance."""
+    significant = results["pvalue"] < 0.05
+    upregulated = significant & (results["log2_fold_change"] > 0)
+    downregulated = significant & (results["log2_fold_change"] < 0)
+
+    colors = np.full(len(results), "lightgrey", dtype=object)
+    colors[upregulated.to_numpy()] = "firebrick"
+    colors[downregulated.to_numpy()] = "steelblue"
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.scatter(
+        results["log2_fold_change"],
+        -np.log10(results["pvalue"]),
+        c=colors,
+        alpha=0.55,
+        s=12,
+        linewidths=0,
+    )
+
+    ax.axhline(-np.log10(0.05), color="black", linestyle="--", alpha=0.7, linewidth=1)
+
+    ax.set_xlabel(
+        "log2 fold change, resistant vs sensitive\n(mean difference in log2(TPM+1))",
+        fontsize=11,
+    )
+    ax.set_ylabel("-log10(p-value)", fontsize=11)
+    ax.set_title(
+        "Differential lncRNA Expression in Platinum-Resistant HGSOC\n"
+        f"TCGA-OV | {resistant_n} resistant vs {sensitive_n} sensitive",
+        fontsize=12,
+    )
+
+    ax.grid(alpha=0.15)
+
+    fig.tight_layout()
+    path = os.path.join(FIGURE_DIR, "volcano_plot.png")
+    fig.savefig(path, dpi=300)
+    plt.close(fig)
+    print(f"\nSaved {path}")
+
+
 def main():
+    os.makedirs(FIGURE_DIR, exist_ok=True)
     os.makedirs(RESULT_DIR, exist_ok=True)
 
     expr, clinical = load_data()
@@ -109,6 +155,12 @@ def main():
     result_path = os.path.join(RESULT_DIR, "de_results.csv")
     results.to_csv(result_path, index=False)
     print(f"Saved {result_path}")
+
+    plot_volcano(
+        results,
+        resistant_n=int((clinical["resistance_tier"] == "Resistant").sum()),
+        sensitive_n=int((clinical["resistance_tier"] == "Sensitive").sum()),
+    )
 
 
 if __name__ == "__main__":
