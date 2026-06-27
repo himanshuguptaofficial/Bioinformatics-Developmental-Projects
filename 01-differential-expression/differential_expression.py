@@ -6,7 +6,8 @@ between patients who go on to become platinum-resistant and those who remain
 platinum-sensitive?
 
 Method: Mann-Whitney U per lncRNA, Benjamini-Hochberg FDR correction.
-Output: volcano plot, plus a ranked table of every lncRNA tested.
+Output: volcano plot with the strongest candidates labelled, plus a ranked
+        table of every lncRNA tested.
 
 Run prepare_data.py first.
 
@@ -18,12 +19,16 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.patches import Patch
 from scipy.stats import mannwhitneyu
 from statsmodels.stats.multitest import multipletests
 
 DERIVED_DIR = os.path.join("..", "data", "derived")
 FIGURE_DIR = "figures"
 RESULT_DIR = "results"
+
+# Genes this far from the origin are worth naming on the plot.
+N_LABELLED = 10
 
 
 def load_data():
@@ -102,8 +107,8 @@ def summarize(results):
     return n_up, n_down
 
 
-def plot_volcano(results, resistant_n, sensitive_n):
-    """Volcano plot of effect size against significance."""
+def plot_volcano(results, n_up, n_down, resistant_n, sensitive_n):
+    """Volcano plot, with the most significant lncRNAs labelled by name."""
     significant = results["pvalue"] < 0.05
     upregulated = significant & (results["log2_fold_change"] > 0)
     downregulated = significant & (results["log2_fold_change"] < 0)
@@ -123,6 +128,18 @@ def plot_volcano(results, resistant_n, sensitive_n):
     )
 
     ax.axhline(-np.log10(0.05), color="black", linestyle="--", alpha=0.7, linewidth=1)
+    ax.axvline(0, color="black", linestyle="-", alpha=0.2, linewidth=1)
+
+    # Name the strongest hits so the plot carries information on its own.
+    for _, row in results.head(N_LABELLED).iterrows():
+        ax.annotate(
+            row["gene_id"].split(".")[0],
+            xy=(row["log2_fold_change"], -np.log10(row["pvalue"])),
+            xytext=(4, 3),
+            textcoords="offset points",
+            fontsize=7,
+            color="black",
+        )
 
     ax.set_xlabel(
         "log2 fold change, resistant vs sensitive\n(mean difference in log2(TPM+1))",
@@ -135,6 +152,15 @@ def plot_volcano(results, resistant_n, sensitive_n):
         fontsize=12,
     )
 
+    ax.legend(
+        handles=[
+            Patch(facecolor="firebrick", label=f"Up in resistant (n={n_up})"),
+            Patch(facecolor="steelblue", label=f"Down in resistant (n={n_down})"),
+            Patch(facecolor="lightgrey", label="Not significant"),
+        ],
+        fontsize=9,
+        loc="upper left",
+    )
     ax.grid(alpha=0.15)
 
     fig.tight_layout()
@@ -150,7 +176,7 @@ def main():
 
     expr, clinical = load_data()
     results = run_differential_expression(expr, clinical)
-    summarize(results)
+    n_up, n_down = summarize(results)
 
     result_path = os.path.join(RESULT_DIR, "de_results.csv")
     results.to_csv(result_path, index=False)
@@ -158,6 +184,8 @@ def main():
 
     plot_volcano(
         results,
+        n_up,
+        n_down,
         resistant_n=int((clinical["resistance_tier"] == "Resistant").sum()),
         sensitive_n=int((clinical["resistance_tier"] == "Sensitive").sum()),
     )
