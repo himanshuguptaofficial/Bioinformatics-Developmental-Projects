@@ -1,11 +1,12 @@
 """
-Cox Model for a 5-lncRNA Risk Score in HGSOC
-============================================
+Kaplan-Meier Survival Analysis with a 5-lncRNA Risk Score
+=========================================================
 Biological question: does a composite risk score built from five lncRNAs
 stratify HGSOC patients by overall survival?
 
 Method: multivariate Cox regression on the five signature lncRNAs adjusted
-        for age at diagnosis.
+        for age, then a median split of the resulting risk score.
+Output: Kaplan-Meier curves for the high- and low-risk groups.
 
 Run prepare_data.py first.
 
@@ -14,10 +15,13 @@ Author: Himanshu Gupta, UC San Diego
 
 import os
 
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
-from lifelines import CoxPHFitter
+from lifelines import CoxPHFitter, KaplanMeierFitter
 
 DERIVED_DIR = os.path.join("..", "data", "derived")
+FIGURE_DIR = "figures"
 
 # The five signature lncRNAs.
 #
@@ -89,7 +93,65 @@ def fit_model(cox_data):
     return model
 
 
+def stratify(model, cox_data):
+    """Split the cohort at the median risk score."""
+    risk_scores = model.predict_partial_hazard(cox_data)
+    median = risk_scores.median()
+    groups = np.where(risk_scores > median, "High", "Low")
+
+    stratified = pd.DataFrame(
+        {
+            "os_time": cox_data["os_time"],
+            "os_event": cox_data["os_event"],
+            "risk_score": risk_scores,
+            "risk_group": groups,
+        }
+    )
+
+    print(f"\nHigh risk: {(groups == 'High').sum()} patients")
+    print(f"Low risk:  {(groups == 'Low').sum()} patients")
+
+    return stratified
+
+
+def plot_kaplan_meier(stratified):
+    high = stratified[stratified["risk_group"] == "High"]
+    low = stratified[stratified["risk_group"] == "Low"]
+
+    fig, ax = plt.subplots(figsize=(10, 6.5))
+
+    fitted = {}
+    for data, label, color in [
+        (high, f"High risk (n={len(high)})", "firebrick"),
+        (low, f"Low risk (n={len(low)})", "steelblue"),
+    ]:
+        kmf = KaplanMeierFitter()
+        kmf.fit(data["os_time"], event_observed=data["os_event"], label=label)
+        kmf.plot_survival_function(ax=ax, color=color, ci_show=True, linewidth=2)
+        fitted[label.split()[0]] = kmf
+
+    ax.set_title(
+        "Overall Survival by 5-lncRNA Risk Score\nTCGA-OV HGSOC cohort",
+        fontsize=12,
+    )
+    ax.set_xlabel("Time (days)", fontsize=11)
+    ax.set_ylabel("Overall survival probability", fontsize=11)
+    ax.set_ylim(0, 1.02)
+    ax.legend(fontsize=10, loc="upper right")
+    ax.grid(alpha=0.15)
+
+    fig.tight_layout()
+    path = os.path.join(FIGURE_DIR, "kaplan_meier.png")
+    fig.savefig(path, dpi=300)
+    plt.close(fig)
+    print(f"\nSaved {path}")
+
+    return fitted
+
+
 def main():
+    os.makedirs(FIGURE_DIR, exist_ok=True)
+
     expr = pd.read_csv(os.path.join(DERIVED_DIR, "expr_lncrna_final.csv"), index_col=0)
     clinical = pd.read_csv(
         os.path.join(DERIVED_DIR, "clinical_hgsoc_filtered.csv"), index_col=0
@@ -101,7 +163,12 @@ def main():
     cox_data = build_cox_data(expr, clinical, signature)
     print(f"Deaths observed: {int(cox_data['os_event'].sum())}")
 
-    fit_model(cox_data)
+    model = fit_model(cox_data)
+    stratified = stratify(model, cox_data)
+
+    fitted = plot_kaplan_meier(stratified)
+    for label, kmf in fitted.items():
+        print(f"Median OS {label:<5} {kmf.median_survival_time_:.0f} days")
 
 
 if __name__ == "__main__":
