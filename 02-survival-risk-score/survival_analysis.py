@@ -5,7 +5,7 @@ Biological question: does a composite risk score built from five lncRNAs
 stratify HGSOC patients by overall survival?
 
 Method: multivariate Cox regression on the five signature lncRNAs adjusted
-        for age, then a median split of the resulting risk score.
+        for age, median split of the resulting risk score, log-rank test.
 Output: Kaplan-Meier curves for the high- and low-risk groups.
 
 Run prepare_data.py first.
@@ -19,6 +19,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from lifelines import CoxPHFitter, KaplanMeierFitter
+from lifelines.statistics import logrank_test
+from lifelines.utils import concordance_index
 
 DERIVED_DIR = os.path.join("..", "data", "derived")
 FIGURE_DIR = "figures"
@@ -114,7 +116,7 @@ def stratify(model, cox_data):
     return stratified
 
 
-def plot_kaplan_meier(stratified):
+def plot_kaplan_meier(stratified, logrank_p, c_index):
     high = stratified[stratified["risk_group"] == "High"]
     low = stratified[stratified["risk_group"] == "Low"]
 
@@ -129,6 +131,16 @@ def plot_kaplan_meier(stratified):
         kmf.fit(data["os_time"], event_observed=data["os_event"], label=label)
         kmf.plot_survival_function(ax=ax, color=color, ci_show=True, linewidth=2)
         fitted[label.split()[0]] = kmf
+
+    p_text = "log-rank p < 0.001" if logrank_p < 0.001 else f"log-rank p = {logrank_p:.4f}"
+    ax.text(
+        0.62,
+        0.88,
+        f"{p_text}\nC-index = {c_index:.3f}",
+        transform=ax.transAxes,
+        fontsize=11,
+        bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.75),
+    )
 
     ax.set_title(
         "Overall Survival by 5-lncRNA Risk Score\nTCGA-OV HGSOC cohort",
@@ -166,7 +178,24 @@ def main():
     model = fit_model(cox_data)
     stratified = stratify(model, cox_data)
 
-    fitted = plot_kaplan_meier(stratified)
+    high = stratified[stratified["risk_group"] == "High"]
+    low = stratified[stratified["risk_group"] == "Low"]
+    test = logrank_test(
+        high["os_time"],
+        low["os_time"],
+        event_observed_A=high["os_event"],
+        event_observed_B=low["os_event"],
+    )
+
+    # concordance_index expects higher = longer survival, so negate the risk.
+    c_index = concordance_index(
+        stratified["os_time"], -stratified["risk_score"], stratified["os_event"]
+    )
+
+    print(f"\nLog-rank p-value: {test.p_value:.3e}")
+    print(f"C-index:          {c_index:.4f}")
+
+    fitted = plot_kaplan_meier(stratified, test.p_value, c_index)
     for label, kmf in fitted.items():
         print(f"Median OS {label:<5} {kmf.median_survival_time_:.0f} days")
 
