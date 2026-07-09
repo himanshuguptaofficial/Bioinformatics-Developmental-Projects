@@ -1,12 +1,13 @@
 """
-Time-Dependent ROC for the 5-lncRNA Risk Score
-==============================================
-Biological question: how well does the 5-lncRNA risk score predict survival,
-and does that change with the prediction horizon?
+Time-Dependent ROC: lncRNA Signature vs Clinical Variables
+==========================================================
+Biological question: does the 5-lncRNA risk score predict survival better
+than the clinical variables an oncologist already has, namely FIGO stage and
+age at diagnosis?
 
-Method: binary survival outcome at 1, 3, and 5 years, ROC and AUC at each.
-        Patients censored before a timepoint are excluded at that timepoint
-        because their status there is unknown.
+Method: binary survival outcome at 1, 3, and 5 years, ROC and AUC for each
+        predictor. Patients censored before a timepoint are excluded at that
+        timepoint because their status there is unknown.
 
 Run prepare_data.py first.
 
@@ -32,6 +33,21 @@ SIGNATURE_LNCRNAS = [
 
 TIMEPOINTS = [(365, "1-Year"), (1095, "3-Year"), (1825, "5-Year")]
 
+# FIGO substages collapse to their parent stage; the ordinal scale is what
+# matters for discrimination.
+FIGO_TO_ORDINAL = {
+    "Stage I": 1, "Stage IA": 1, "Stage IB": 1, "Stage IC": 1,
+    "Stage II": 2, "Stage IIA": 2, "Stage IIB": 2, "Stage IIC": 2,
+    "Stage III": 3, "Stage IIIA": 3, "Stage IIIB": 3, "Stage IIIC": 3,
+    "Stage IV": 4,
+}
+
+PREDICTORS = [
+    ("lncRNA signature", "risk_score"),
+    ("Age at diagnosis", "age"),
+    ("FIGO stage", "figo"),
+]
+
 
 def compute_risk_scores(expr, clinical):
     """Refit the project 02 Cox model so this analysis stands alone."""
@@ -53,6 +69,34 @@ def compute_risk_scores(expr, clinical):
     return model.predict_partial_hazard(cox_data)
 
 
+def build_comparison_frame(clinical, risk_scores):
+    """Align the three predictors on a single complete-case cohort.
+
+    Comparing AUCs computed on different subsets would not be meaningful, so
+    every predictor is evaluated on the same patients. FIGO stage is the
+    limiting variable.
+    """
+    frame = pd.DataFrame(
+        {
+            "os_time": clinical["os_time"],
+            "os_event": clinical["os_event"],
+            "risk_score": risk_scores,
+            "age": clinical["age_years"],
+            "figo": clinical["figo_stage"].map(FIGO_TO_ORDINAL),
+        }
+    )
+
+    before = len(frame)
+    frame = frame.dropna()
+    print(f"Complete-case cohort: {len(frame)} of {before} patients")
+    print(f"  Deaths: {int(frame['os_event'].sum())}")
+    print("  FIGO distribution:")
+    for stage, count in sorted(frame["figo"].value_counts().items()):
+        print(f"    stage {int(stage)}: {count}")
+
+    return frame
+
+
 def binary_outcome_at(frame, horizon):
     """Label each patient dead/alive at a horizon, dropping the unknowable.
 
@@ -66,6 +110,26 @@ def binary_outcome_at(frame, horizon):
     return died_before[evaluable].astype(int), evaluable
 
 
+def compute_aucs(frame):
+    """AUC for every predictor at every horizon."""
+    auc_table = {}
+
+    for horizon, label in TIMEPOINTS:
+        outcome, evaluable = binary_outcome_at(frame, horizon)
+        print(
+            f"\n{label} (day {horizon}): {evaluable.sum()} evaluable, "
+            f"{int(outcome.sum())} deaths"
+        )
+
+        for name, column in PREDICTORS:
+            fpr, tpr, _ = roc_curve(outcome, frame.loc[evaluable, column])
+            roc_auc = auc(fpr, tpr)
+            auc_table.setdefault(name, {})[label] = roc_auc
+            print(f"  {name:<20} AUC={roc_auc:.3f}")
+
+    return auc_table
+
+
 def main():
     expr = pd.read_csv(os.path.join(DERIVED_DIR, "expr_lncrna_final.csv"), index_col=0)
     clinical = pd.read_csv(
@@ -73,24 +137,18 @@ def main():
     )
 
     risk_scores = compute_risk_scores(expr, clinical)
+    frame = build_comparison_frame(clinical, risk_scores)
+    auc_table = compute_aucs(frame)
 
-    frame = pd.DataFrame(
-        {
-            "os_time": clinical["os_time"],
-            "os_event": clinical["os_event"],
-            "risk_score": risk_scores,
-        }
-    ).dropna()
-    print(f"Patients with a risk score: {len(frame)}")
-
-    for horizon, label in TIMEPOINTS:
-        outcome, evaluable = binary_outcome_at(frame, horizon)
-        fpr, tpr, _ = roc_curve(outcome, frame.loc[evaluable, "risk_score"])
-
-        print(
-            f"{label} (day {horizon}): {evaluable.sum()} evaluable, "
-            f"{int(outcome.sum())} deaths, AUC={auc(fpr, tpr):.3f}"
+    print("\nAUC summary:")
+    header = f"{'Predictor':<20}" + "".join(f"{label:>10}" for _, label in TIMEPOINTS)
+    print(header)
+    print("-" * len(header))
+    for name, by_time in auc_table.items():
+        row = f"{name:<20}" + "".join(
+            f"{by_time[label]:>10.3f}" for _, label in TIMEPOINTS
         )
+        print(row)
 
 
 if __name__ == "__main__":
