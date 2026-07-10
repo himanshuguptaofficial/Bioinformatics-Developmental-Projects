@@ -8,6 +8,7 @@ age at diagnosis?
 Method: binary survival outcome at 1, 3, and 5 years, ROC and AUC for each
         predictor. Patients censored before a timepoint are excluded at that
         timepoint because their status there is unknown.
+Output: three-panel ROC figure.
 
 Run prepare_data.py first.
 
@@ -16,11 +17,14 @@ Author: Himanshu Gupta, UC San Diego
 
 import os
 
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from lifelines import CoxPHFitter
 from sklearn.metrics import auc, roc_curve
 
 DERIVED_DIR = os.path.join("..", "data", "derived")
+FIGURE_DIR = "figures"
 
 # Same signature as project 02; see that script for provenance.
 SIGNATURE_LNCRNAS = [
@@ -41,12 +45,6 @@ FIGO_TO_ORDINAL = {
     "Stage III": 3, "Stage IIIA": 3, "Stage IIIB": 3, "Stage IIIC": 3,
     "Stage IV": 4,
 }
-
-PREDICTORS = [
-    ("lncRNA signature", "risk_score"),
-    ("Age at diagnosis", "age"),
-    ("FIGO stage", "figo"),
-]
 
 
 def compute_risk_scores(expr, clinical):
@@ -110,27 +108,57 @@ def binary_outcome_at(frame, horizon):
     return died_before[evaluable].astype(int), evaluable
 
 
-def compute_aucs(frame):
-    """AUC for every predictor at every horizon."""
+def plot_roc_panels(frame):
+    predictors = [
+        ("lncRNA signature", "risk_score", "steelblue"),
+        ("Age at diagnosis", "age", "forestgreen"),
+        ("FIGO stage", "figo", "firebrick"),
+    ]
+
+    fig, axes = plt.subplots(1, 3, figsize=(17, 5.8))
     auc_table = {}
 
-    for horizon, label in TIMEPOINTS:
+    for ax, (horizon, label) in zip(axes, TIMEPOINTS):
         outcome, evaluable = binary_outcome_at(frame, horizon)
-        print(
-            f"\n{label} (day {horizon}): {evaluable.sum()} evaluable, "
-            f"{int(outcome.sum())} deaths"
-        )
+        n_events = int(outcome.sum())
 
-        for name, column in PREDICTORS:
-            fpr, tpr, _ = roc_curve(outcome, frame.loc[evaluable, column])
+        print(f"\n{label} (day {horizon}): {evaluable.sum()} evaluable, {n_events} deaths")
+
+        for name, column, color in predictors:
+            scores = frame.loc[evaluable, column]
+            fpr, tpr, _ = roc_curve(outcome, scores)
             roc_auc = auc(fpr, tpr)
             auc_table.setdefault(name, {})[label] = roc_auc
+
+            ax.plot(fpr, tpr, color=color, lw=2, label=f"{name} (AUC={roc_auc:.3f})")
             print(f"  {name:<20} AUC={roc_auc:.3f}")
+
+        ax.plot([0, 1], [0, 1], "k--", lw=1, alpha=0.6, label="Random (0.500)")
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1.02)
+        ax.set_xlabel("False positive rate", fontsize=10)
+        ax.set_ylabel("True positive rate", fontsize=10)
+        ax.set_title(f"{label} survival", fontsize=11)
+        ax.legend(loc="lower right", fontsize=9)
+        ax.grid(alpha=0.2)
+
+    fig.suptitle(
+        "Time-Dependent ROC: 5-lncRNA Signature vs Clinical Variables",
+        fontsize=13,
+    )
+    fig.tight_layout()
+
+    path = os.path.join(FIGURE_DIR, "time_dependent_roc.png")
+    fig.savefig(path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    print(f"\nSaved {path}")
 
     return auc_table
 
 
 def main():
+    os.makedirs(FIGURE_DIR, exist_ok=True)
+
     expr = pd.read_csv(os.path.join(DERIVED_DIR, "expr_lncrna_final.csv"), index_col=0)
     clinical = pd.read_csv(
         os.path.join(DERIVED_DIR, "clinical_hgsoc_filtered.csv"), index_col=0
@@ -138,7 +166,7 @@ def main():
 
     risk_scores = compute_risk_scores(expr, clinical)
     frame = build_comparison_frame(clinical, risk_scores)
-    auc_table = compute_aucs(frame)
+    auc_table = plot_roc_panels(frame)
 
     print("\nAUC summary:")
     header = f"{'Predictor':<20}" + "".join(f"{label:>10}" for _, label in TIMEPOINTS)
