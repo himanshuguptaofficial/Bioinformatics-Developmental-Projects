@@ -138,12 +138,13 @@ def plot_roc_panels(frame):
         ax.set_ylim(0, 1.02)
         ax.set_xlabel("False positive rate", fontsize=10)
         ax.set_ylabel("True positive rate", fontsize=10)
-        ax.set_title(f"{label} survival", fontsize=11)
+        ax.set_title(f"{label} survival (n={evaluable.sum()}, {n_events} deaths)", fontsize=11)
         ax.legend(loc="lower right", fontsize=9)
         ax.grid(alpha=0.2)
 
     fig.suptitle(
-        "Time-Dependent ROC: 5-lncRNA Signature vs Clinical Variables",
+        "Time-Dependent ROC: 5-lncRNA Signature vs Clinical Variables\n"
+        f"TCGA-OV HGSOC, n={len(frame)} with complete clinical data",
         fontsize=13,
     )
     fig.tight_layout()
