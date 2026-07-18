@@ -1,14 +1,16 @@
 """
-Genes Co-expressed with the lncRNA Signature
-============================================
-Biological question: lncRNAs act largely by regulating other genes, so which
-protein-coding genes track the platinum-resistance signature lncRNAs across
-patients?
+Pathway Enrichment of Genes Co-expressed with the lncRNA Signature
+=================================================================
+Biological question: lncRNAs act largely by regulating other genes, so what
+biological processes are the platinum-resistance signature lncRNAs wired
+into?
 
 Method: Spearman correlation between each signature lncRNA and every
-        protein-coding gene, keeping |rho| >= 0.3 and p < 0.05.
+        protein-coding gene, |rho| >= 0.3 and p < 0.05, then over-representation
+        analysis of the union against KEGG and GO Biological Process.
+Output: ranked enrichment tables for both libraries.
 
-Run prepare_data.py first.
+Requires network access for the Enrichr API. Run prepare_data.py first.
 
 Author: Himanshu Gupta, UC San Diego
 """
@@ -16,12 +18,14 @@ Author: Himanshu Gupta, UC San Diego
 import gzip
 import os
 
+import gseapy as gp
 import numpy as np
 import pandas as pd
 from scipy import stats
 
 DERIVED_DIR = os.path.join("..", "data", "derived")
 GTF_PATH = os.path.join("..", "data", "gencode.v44.gtf.gz")
+RESULT_DIR = "results"
 
 # Same signature as project 02; see that script for provenance.
 SIGNATURE_LNCRNAS = [
@@ -125,7 +129,29 @@ def find_coexpressed(expr_lncrna, expr_all, protein_coding):
     return list(union)
 
 
+def run_enrichment(gene_symbols, library, label):
+    """Over-representation analysis against one Enrichr library."""
+    print(f"\nRunning {label} enrichment on {len(gene_symbols)} symbols")
+
+    enrichment = gp.enrichr(
+        gene_list=gene_symbols,
+        gene_sets=[library],
+        organism="human",
+        outdir=None,
+    )
+    results = enrichment.results.sort_values("Adjusted P-value")
+
+    n_significant = int((results["Adjusted P-value"] < 0.05).sum())
+    print(f"  Significant terms (adj p < 0.05): {n_significant}")
+    for _, row in results.head(5).iterrows():
+        print(f"    {row['Term'][:60]:<62} adj p={row['Adjusted P-value']:.2e}")
+
+    return results
+
+
 def main():
+    os.makedirs(RESULT_DIR, exist_ok=True)
+
     protein_coding, symbols = parse_gencode(GTF_PATH)
 
     print("\nLoading expression matrices")
@@ -141,6 +167,13 @@ def main():
 
     gene_symbols = sorted({symbols[g] for g in coexpressed if g in symbols})
     print(f"Mapped to {len(gene_symbols)} gene symbols")
+
+    kegg = run_enrichment(gene_symbols, "KEGG_2021_Human", "KEGG")
+    go = run_enrichment(gene_symbols, "GO_Biological_Process_2021", "GO BP")
+
+    kegg.to_csv(os.path.join(RESULT_DIR, "kegg_enrichment.csv"), index=False)
+    go.to_csv(os.path.join(RESULT_DIR, "go_enrichment.csv"), index=False)
+    print(f"\nWrote enrichment tables to {RESULT_DIR}/")
 
 
 if __name__ == "__main__":
