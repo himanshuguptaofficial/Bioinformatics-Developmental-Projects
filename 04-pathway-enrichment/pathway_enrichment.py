@@ -16,6 +16,7 @@ Author: Himanshu Gupta, UC San Diego
 import gzip
 import os
 
+import numpy as np
 import pandas as pd
 from scipy import stats
 
@@ -71,6 +72,33 @@ def parse_gencode(gtf_path):
     return protein_coding, symbols
 
 
+def spearman_against_all(lncrna_expr, gene_expr):
+    """Spearman rho and p-value for every (lncRNA, gene) pair.
+
+    Spearman is Pearson on ranks, so ranking once and taking a single matrix
+    product is equivalent to looping over ~19k genes five times and far
+    faster.
+    """
+    n_samples = lncrna_expr.shape[1]
+
+    def zscored_ranks(matrix):
+        ranks = stats.rankdata(matrix, axis=1)
+        centered = ranks - ranks.mean(axis=1, keepdims=True)
+        return centered / np.linalg.norm(centered, axis=1, keepdims=True)
+
+    lnc_z = zscored_ranks(lncrna_expr.to_numpy())
+    gene_z = zscored_ranks(gene_expr.to_numpy())
+
+    rho = lnc_z @ gene_z.T
+    rho = np.clip(rho, -0.9999999, 0.9999999)
+
+    # Two-sided p from the usual t approximation.
+    t_stat = rho * np.sqrt((n_samples - 2) / (1 - rho**2))
+    pvalues = 2 * stats.t.sf(np.abs(t_stat), df=n_samples - 2)
+
+    return rho, pvalues
+
+
 def find_coexpressed(expr_lncrna, expr_all, protein_coding):
     """Collect protein-coding genes correlated with any signature lncRNA."""
     base_ids = expr_lncrna.index.str.split(".").str[0]
@@ -83,21 +111,18 @@ def find_coexpressed(expr_lncrna, expr_all, protein_coding):
     coding_base = all_base[coding_mask]
     print(f"  Protein-coding genes in matrix: {len(coding_expr)}")
 
-    union = set()
-    for lncrna in signature:
-        lncrna_values = expr_lncrna.loc[lncrna, coding_expr.columns]
+    lncrna_expr = expr_lncrna.loc[signature, coding_expr.columns]
+    rho, pvalues = spearman_against_all(lncrna_expr, coding_expr)
 
-        hits = []
-        for gene_id, gene_values in zip(coding_base, coding_expr.to_numpy()):
-            rho, pvalue = stats.spearmanr(lncrna_values, gene_values)
-            if abs(rho) >= CORRELATION_THRESHOLD and pvalue < P_THRESHOLD:
-                hits.append(gene_id)
+    significant = (np.abs(rho) >= CORRELATION_THRESHOLD) & (pvalues < P_THRESHOLD)
 
-        print(f"  {lncrna}: {len(hits)} co-expressed genes")
-        union.update(hits)
+    for gene, row in zip(signature, significant):
+        print(f"  {gene}: {int(row.sum())} co-expressed genes")
 
+    union = coding_base[significant.any(axis=0)]
     print(f"\nUnion of co-expressed genes: {len(union)}")
-    return sorted(union)
+
+    return list(union)
 
 
 def main():
