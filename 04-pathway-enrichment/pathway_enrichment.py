@@ -8,7 +8,7 @@ into?
 Method: Spearman correlation between each signature lncRNA and every
         protein-coding gene, |rho| >= 0.3 and p < 0.05, then over-representation
         analysis of the union against KEGG and GO Biological Process.
-Output: ranked enrichment tables for both libraries.
+Output: bar charts of the most enriched pathways and GO terms.
 
 Requires network access for the Enrichr API. Run prepare_data.py first.
 
@@ -19,12 +19,14 @@ import gzip
 import os
 
 import gseapy as gp
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy import stats
 
 DERIVED_DIR = os.path.join("..", "data", "derived")
 GTF_PATH = os.path.join("..", "data", "gencode.v44.gtf.gz")
+FIGURE_DIR = "figures"
 RESULT_DIR = "results"
 
 # Same signature as project 02; see that script for provenance.
@@ -38,6 +40,7 @@ SIGNATURE_LNCRNAS = [
 
 CORRELATION_THRESHOLD = 0.3
 P_THRESHOLD = 0.05
+TOP_N_TERMS = 15
 
 
 def parse_gencode(gtf_path):
@@ -149,7 +152,43 @@ def run_enrichment(gene_symbols, library, label):
     return results
 
 
+def plot_enrichment(kegg, go):
+    """Horizontal bar charts of the most enriched terms."""
+    fig, axes = plt.subplots(1, 2, figsize=(18, 8))
+
+    panels = [
+        (axes[0], kegg, "KEGG 2021 Human", "steelblue"),
+        (axes[1], go, "GO Biological Process 2021", "darkseagreen"),
+    ]
+
+    for ax, results, title, color in panels:
+        top = results.head(TOP_N_TERMS).iloc[::-1]  # largest at the top
+        terms = [t if len(t) <= 55 else t[:52] + "..." for t in top["Term"]]
+        neg_log_p = -np.log10(top["Adjusted P-value"])
+
+        ax.barh(range(len(terms)), neg_log_p, color=color, alpha=0.85,
+                edgecolor="white")
+        ax.set_yticks(range(len(terms)))
+        ax.set_yticklabels(terms, fontsize=9)
+        ax.set_xlabel("-log10(adjusted p-value)", fontsize=10)
+        ax.set_title(f"Top {TOP_N_TERMS}: {title}", fontsize=12)
+        ax.grid(axis="x", alpha=0.2)
+
+    fig.suptitle(
+        "Pathway Enrichment of Genes Co-expressed with the 5-lncRNA Signature\n"
+        "TCGA-OV HGSOC",
+        fontsize=13,
+    )
+    fig.tight_layout()
+
+    path = os.path.join(FIGURE_DIR, "pathway_enrichment.png")
+    fig.savefig(path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    print(f"\nSaved {path}")
+
+
 def main():
+    os.makedirs(FIGURE_DIR, exist_ok=True)
     os.makedirs(RESULT_DIR, exist_ok=True)
 
     protein_coding, symbols = parse_gencode(GTF_PATH)
@@ -173,7 +212,8 @@ def main():
 
     kegg.to_csv(os.path.join(RESULT_DIR, "kegg_enrichment.csv"), index=False)
     go.to_csv(os.path.join(RESULT_DIR, "go_enrichment.csv"), index=False)
-    print(f"\nWrote enrichment tables to {RESULT_DIR}/")
+
+    plot_enrichment(kegg, go)
 
 
 if __name__ == "__main__":
