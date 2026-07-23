@@ -170,8 +170,11 @@ def plot_enrichment(kegg, go):
                 edgecolor="white")
         ax.set_yticks(range(len(terms)))
         ax.set_yticklabels(terms, fontsize=9)
+        ax.axvline(-np.log10(0.05), color="firebrick", linestyle="--",
+                   alpha=0.8, label="adj p = 0.05")
         ax.set_xlabel("-log10(adjusted p-value)", fontsize=10)
         ax.set_title(f"Top {TOP_N_TERMS}: {title}", fontsize=12)
+        ax.legend(fontsize=9, loc="lower right")
         ax.grid(axis="x", alpha=0.2)
 
     fig.suptitle(
