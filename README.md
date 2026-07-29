@@ -5,8 +5,6 @@ cohort. Each one answers a single biological question and produces a single
 figure. They share a dataset and build on each other, but every project runs
 independently.
 
-Author: Himanshu Gupta, UC San Diego
-
 ## Motivation
 High-grade serous ovarian cancer (HGSOC) causes 70–80% of ovarian cancer
 deaths. Most patients respond to first-line platinum chemotherapy, but 80–90%
@@ -23,11 +21,6 @@ uncharacterised, carry information about that outcome.
 | 02 | [Survival risk score](02-survival-risk-score) | Does a composite of five lncRNAs stratify survival? | log-rank p = 1.2 × 10⁻⁹, roughly a 2-year median survival gap |
 | 03 | [Time-dependent ROC](03-time-dependent-roc) | Does it beat FIGO stage and age? | 5-year AUC 0.748 against 0.480 (age) and 0.471 (stage) |
 | 04 | [Pathway enrichment](04-pathway-enrichment) | What biology is the signature in? | Overwhelmingly immune, cytokine and T-cell signaling |
-
-Read in order they tell one story. No single lncRNA predicts platinum
-resistance, but a composite of five predicts survival better than the clinical
-variables currently in use, and the biology it reads out looks like the tumour
-immune microenvironment rather than a cell-intrinsic resistance mechanism.
 
 ## Repository layout
 ```
