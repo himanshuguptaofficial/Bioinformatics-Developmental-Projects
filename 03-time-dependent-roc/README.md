@@ -2,19 +2,15 @@
 
 ## Question
 [Project 02](../02-survival-risk-score) showed that the 5-lncRNA risk score
-separates survival curves. But an oncologist already has FIGO stage and age at
-diagnosis for free. Does the signature add anything those two do not already
-provide?
+separates survival curves. Does the signature add anything biologically relevant that is not provided by FIGO score and age?
 
 ## Background
 A biomarker that only recapitulates known clinical variables is not clinically
 useful, however small its p-value. The honest test is a head-to-head comparison
 against the existing standard of care, run on the same patients.
 
-Survival prediction is also time-dependent. A marker can be informative for
-early death and useless for late death, or the other way round. So the
-comparison is made separately at 1, 3 and 5 years instead of being collapsed
-into a single number.
+Survival prediction is also time-dependent. The
+comparison is made separately at 1, 3 and 5 years to determine the relevance of the biomarker at different time-intervals.
 
 ## Method
 1. Refit the project 02 Cox model to get risk scores, so this project stands
@@ -29,8 +25,8 @@ there is genuinely unknown, and assuming either outcome would bias the result.
 
 All three predictors are evaluated on the same complete-case cohort of 128
 patients with 79 deaths, since comparing AUCs computed on different subsets
-would not mean much. FIGO stage is the limiting variable, missing for 88 of the
-216 patients.
+would not mean much. FIGO stage is the limiting variable (missing for 88 of the
+216 patients).
 
 ## Results
 
@@ -50,13 +46,10 @@ from random guessing at that horizon. In this cohort the signature is the only
 one of the three carrying real long-term prognostic information.
 
 ### The 1-year panel should not be trusted
-An AUC of 0.927 looks spectacular and means very little here, because only 2
-patients died within the first year among the 126 evaluable. The step-function
-shape of the left panel gives it away, since the curve is being drawn from two
-events. It is reported because the 1/3/5-year convention is standard, but no
-conclusion should rest on it.
+An AUC of 0.927 is an extremely promising result. However, it means very little here, because only 2
+patients died within the first year among the 126 evaluable. 
 
-The 3-year and 5-year panels, with 32 and 60 deaths, are the substantive
+The 3-year and 5-year panels, with 32 and 60 deaths, are substantive
 results.
 
 ### Why FIGO stage does so badly
@@ -68,8 +61,7 @@ variable it cannot discriminate. Stage separates early disease from late
 disease, and there is virtually no early disease here.
 
 ### Limitations
-- Same caveat as project 02. The signature was selected on this cohort, so its
-  AUCs are optimistic in a way the clinical variables' are not. The comparison
+- The signature was selected on this cohort, so the comparison
   favours the signature by construction and should be repeated out-of-sample.
 - Restricting to complete FIGO data cuts the cohort from 216 to 128.
 
