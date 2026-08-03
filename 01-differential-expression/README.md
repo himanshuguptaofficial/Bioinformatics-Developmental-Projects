@@ -18,12 +18,12 @@ This analysis checks whether lncRNAs carry any of that signal.
 
 ## Dataset
 TCGA-OV RNA-seq, restricted to the 216 confirmed HGSOC primary tumours that
-have a definitive platinum status. The filtering cascade lives in
+have a definitive platinum status. The filtering cascade is further described in
 `prepare_data.py` at the repository root.
 
 Only the two extremes are compared, 67 resistant against 94 sensitive. The 55
 partially sensitive patients (PFI 6–12 months) sit between the groups, and
-including them blurs the contrast.
+including them blurs the contrast (for this reason, they were filtered out for this analysis).
 
 ## Method
 1. log2(TPM+1) normalization, low-expression genes dropped
@@ -39,11 +39,11 @@ visibly non-normal and the two groups are different sizes.
 ![Volcano plot of differential lncRNA expression](figures/volcano_plot.png)
 
 554 lncRNAs reach raw p < 0.05: 197 higher in resistant patients and 357 lower.
-The skew towards downregulation is worth noting on its own. Resistance tracks
+The skew towards downregulation is significant; resistance tracks
 with loss of lncRNA expression more than with gain.
 
-Nothing survives FDR correction. The smallest adjusted p-value is 0.326, and
-the volcano plot shows why. It is a broad cloud of modest effects rather than a
+Nothing survives FDR correction. The smallest adjusted p-value is 0.326;
+the volcano plot indicates why: it is a broad cloud of modest effects rather than a
 few dominant hits, with most effect sizes under 0.6 log2 units.
 
 The strongest individual candidates:
@@ -57,7 +57,7 @@ The strongest individual candidates:
 | ENSG00000264269 | −0.325 | 4.60 × 10⁻⁴ | Down in resistant |
 
 ### Reading the null FDR result
-Failing FDR at n = 161 is expected rather than disqualifying, and it lines up
+Failing FDR at n = 161 is expected and it lines up
 with what other published TCGA-OV lncRNA studies report. Correcting 12,290
 tests demands large individual effects, and lncRNAs are expressed at low
 absolute levels with high variance between patients. The conclusion to draw is
