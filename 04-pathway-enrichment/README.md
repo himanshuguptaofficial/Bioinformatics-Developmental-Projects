@@ -2,16 +2,15 @@
 
 ## Question
 The earlier projects establish that the 5-lncRNA signature predicts survival.
-What biology does it sit in?
+What is the specific biological context of these findings?
 
 ## Background
 lncRNAs are hard to interpret directly. They have no reading frame, and four of
 the five signature lncRNAs have no assigned gene symbol at all. The usual
-workaround is guilt by association: find the protein-coding genes whose
-expression tracks the lncRNA across patients, then ask what those genes do.
-This does not establish causation, since co-expression can reflect shared
-regulation, shared cell-type composition, or a genuine regulatory relationship.
-It does say which biological programme the lncRNA is embedded in.
+workaround is to find the protein-coding genes whose
+expression tracks the lncRNA across patients, then determine the specific function of those genes.
+This establishes a correlational relationship since co-expression can reflect shared
+regulation, shared cell-type composition, or genuine regulatory relationship.
 
 ## Method
 1. Spearman correlation between each signature lncRNA and all 18,519
