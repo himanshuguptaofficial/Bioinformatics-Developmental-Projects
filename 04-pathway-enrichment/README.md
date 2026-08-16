@@ -1,8 +1,11 @@
 # Pathway Enrichment of Genes Co-expressed with the lncRNA Signature
 
 ## Question
-The earlier projects establish that the 5-lncRNA signature predicts survival.
-What is the specific biological context of these findings?
+Projects [02](../02-survival-risk-score) and [03](../03-time-dependent-roc)
+report an apparent survival association for the 5-lncRNA signature
+([project 05](../05-honest-validation) tests how much of it is real). Whatever
+its prognostic value, the five lncRNAs are real transcripts with real
+co-expression partners. What is the specific biological context they sit in?
 
 ## Background
 lncRNAs are hard to interpret directly. They have no reading frame, and four of
@@ -64,11 +67,11 @@ resistance.
 ### Interpretation
 This points at the tumour immune microenvironment rather than a cell-intrinsic
 resistance mechanism. That is biologically coherent, since immune infiltration
-is an established prognostic factor in HGSOC. It also offers a plausible
-account of why the signature predicts survival strongly (projects 02 and 03)
-while the underlying lncRNAs are only weakly associated with platinum response
-itself (project 01). The signature may be reading out immune context more than
-chemoresistance biology.
+is an established prognostic factor in HGSOC. It is also consistent with the
+validation result in [project 05](../05-honest-validation): a signature whose
+co-expression neighbourhood is dominated by immune context rather than
+chemoresistance biology has no particular reason to generalize as a platinum
+resistance predictor, and out-of-fold it does not.
 
 One caveat follows directly from that. Bulk RNA-seq cannot separate expression
 in tumour cells from expression in infiltrating immune cells, so an immune
