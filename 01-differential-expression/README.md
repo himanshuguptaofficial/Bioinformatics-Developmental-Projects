@@ -65,9 +65,12 @@ narrow: no single lncRNA works as a standalone biomarker of platinum resistance
 at this cohort size.
 
 So the 554 candidates are a screening stage rather than a result.
-[Project 02](../02-survival-risk-score) carries them forward and shows that a
-composite of five does stratify survival, which suggests the signal is real but
-spread thinly across many lncRNAs instead of concentrated in one.
+[Project 02](../02-survival-risk-score) carries them forward into a composite
+score with a spectacular apparent p-value — and
+[project 05](../05-honest-validation) then shows that apparent performance is
+almost entirely selection optimism. In hindsight the null reported here was
+the truthful reading of this cohort: at raw p < 0.05 with 12,290 tests,
+roughly 615 hits are expected by chance alone, and 554 were observed.
 
 ## Output
 - `figures/volcano_plot.png`, the figure above

@@ -49,29 +49,39 @@ because age at diagnosis is missing and Cox needs complete cases.
 The two groups separate cleanly and stay separated for the full follow-up
 period.
 
-| Metric | Value |
-|---|---|
-| Log-rank p-value | 1.2 × 10⁻⁹ |
-| Harrell C-index | 0.686 |
-| Median OS, high risk | 1157 days (~3.2 years) |
-| Median OS, low risk | 1877 days (~5.1 years) |
+| Metric | Apparent (this analysis) | Honest (out-of-fold, [project 05](../05-honest-validation)) |
+|---|---|---|
+| Log-rank p-value | 1.2 × 10⁻⁹ | 0.41 |
+| Harrell C-index | 0.686 | 0.517 (permutation p = 0.33) |
+| Median OS, high risk | 1157 days (~3.2 years) | — |
+| Median OS, low risk | 1877 days (~5.1 years) | — |
 
-Median survival differs by roughly 720 days, about two years, which is a large
-effect for a transcriptomic signature in ovarian cancer.
+Median survival differs by roughly 720 days in the apparent analysis, about
+two years. But the right-hand column is the important one: when the entire
+selection pipeline is re-run inside cross-validation folds so that no patient
+is scored by a model that has seen their outcome, the performance collapses
+to chance. The apparent numbers are what this construction produces; project
+05 measures how much of it is real, and the answer is essentially none.
 
 Age went into the model as a covariate and was not significant (HR 1.011 per
 year, p = 0.197), so the separation is not an age artifact.
 
-### Why this matters given the null result in project 01
-Taken one at a
-time these lncRNAs are unremarkable and one of the five (ENSG00000241912) is
-not even significant on its own at p = 0.172. Put together, they reach
-p = 1.2 × 10⁻⁹. 
+### Why the contrast with project 01 is instructive
+Taken one at a time these lncRNAs are unremarkable and one of the five
+(ENSG00000241912) is not even significant on its own at p = 0.172. Put
+together, they reach p = 1.2 × 10⁻⁹. When this analysis was first written,
+that contrast read as "the signal is real but distributed, and only a
+composite recovers it." [Project 05](../05-honest-validation) shows the
+correct reading is less flattering: a pipeline that screens 12,290 lncRNAs
+on 216 patients can assemble a composite this impressive from noise, and the
+p-value mostly measures the flexibility of the selection procedure rather
+than biology. Project 01's null was the truthful result all along.
 
 ### Limitations
 - This is not out-of-sample performance. The signature was selected on this
-  cohort, so the C-index of 0.686 is optimistic. A held-out or external cohort
-  would give the real number.
+  cohort, so every number above is optimistic. Project 05 quantifies the
+  optimism: out-of-fold, the C-index falls from 0.686 to 0.517 and is
+  indistinguishable from chance (permutation p = 0.33).
 - A median split is convenient but arbitrary and it throws away the ordering
   within each group.
 - C-index 0.686 is clearly better than chance but it falls below the ~0.7

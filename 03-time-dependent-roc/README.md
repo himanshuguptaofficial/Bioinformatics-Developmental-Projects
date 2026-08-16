@@ -38,12 +38,16 @@ would not mean much. FIGO stage is the limiting variable (missing for 88 of the
 | Age at diagnosis | 0.782 | 0.615 | 0.480 |
 | FIGO stage | 0.464 | 0.519 | 0.471 |
 
-The signature comes out ahead of both clinical variables at every horizon.
-
-The 5-year column is the most informative one: 0.748 for the signature against
-0.480 for age and 0.471 for FIGO stage, both of which are indistinguishable
-from random guessing at that horizon. In this cohort the signature is the only
-one of the three carrying real long-term prognostic information.
+The signature comes out ahead of both clinical variables at every horizon —
+but this comparison is rigged in the signature's favour, and the rigging turns
+out to account for the entire result. The signature was selected on these
+patients while age and FIGO stage were not, so its AUCs carry selection
+optimism theirs cannot. [Project 05](../05-honest-validation) measures that
+optimism directly: scored out-of-fold, the signature's overall discrimination
+drops to chance (C-index 0.517, permutation p = 0.33). The honest conclusion
+is not "the signature beats the clinic," it is "a signature fit to this cohort
+can be made to look like it beats the clinic," which is a caution about this
+very common comparison rather than a finding about lncRNAs.
 
 ### The 1-year panel should not be trusted
 An AUC of 0.927 is an extremely promising result. However, it means very little here, because only 2
@@ -61,8 +65,10 @@ variable it cannot discriminate. Stage separates early disease from late
 disease, and there is virtually no early disease here.
 
 ### Limitations
-- The signature was selected on this cohort, so the comparison
-  favours the signature by construction and should be repeated out-of-sample.
+- The central one is quantified above: the signature's AUCs are optimistic in
+  a way the clinical variables' are not, and project 05 shows the optimism is
+  the whole effect. The AUC table describes this cohort's fitted model, not
+  expected performance on new patients.
 - Restricting to complete FIGO data cuts the cohort from 216 to 128.
 
 ## Output
