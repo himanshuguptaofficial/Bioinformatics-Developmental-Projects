@@ -9,18 +9,16 @@ lncRNAs were selected using all 216 patients and then scored on those same
 by a model that has seen their outcome?
 
 ## Background
-This is the question that decides whether the first four projects found
-biology or built a mirror. Resubstitution estimates are optimistic whenever
-feature selection touches the evaluation data, and the effect is severe when
+This is the question that decides whether the first four projects are biologically
+relevant. Resubstitution estimates are optimistic whenever
+feature selection uses the evaluation data, and the effect is severe when
 12,290 features are screened on 216 patients. The literature is full of
 prognostic signatures published on exactly this kind of estimate, which is a
 large part of why so few of them replicate.
 
-External validation would be the ideal fix, but no suitable cohort exists:
-GSE268514 has expression without outcomes, and GSE9891 is on a microarray
-platform (GPL570) that carries essentially no lncRNA probes. What remains is
-internal validation done correctly, which is enough to answer whether an
-external cohort is worth chasing.
+External validation would be the ideal fix but no suitable cohort exists. What remains 
+is proper internal validation to establish whether the signature warrants evaluation 
+in an independent external cohort.
 
 ## Method
 Three estimates of the same quantity, from least to most honest:
@@ -71,9 +69,7 @@ Only re-running the choice itself inside each fold exposes it.
 The stability audit says the same thing from a different angle. Across 50
 training folds the pipeline selected 76 distinct lncRNAs. The most stable
 single gene (ENSG00000241912) appeared in 33 of 50 folds; the other four
-published lncRNAs came back in 42%, 34%, 30% and 10% of folds. A procedure
-recovering real biology would keep choosing the same genes. This one
-mostly does not.
+published lncRNAs came back in 42%, 34%, 30% and 10% of folds.
 
 ### What this means for projects 01–04
 - **01** is unaffected: it already reported that nothing survives FDR
@@ -85,15 +81,6 @@ mostly does not.
 - **04** characterized the co-expression neighbourhood of five specific
   lncRNAs. That analysis is descriptive and stands, but the premise that
   these five carry prognostic signal does not.
-
-### Why this is the most useful result in the repository
-Dozens of published ovarian cancer lncRNA signatures were built with
-exactly this pipeline — DE screen, univariate Cox, LASSO, evaluate on the
-training cohort — and report exactly this kind of number. This repository
-built one, got the spectacular apparent statistics, and then measured how
-much was real: almost none. That is a reproducible, quantified
-demonstration of why such signatures fail to replicate, and it is worth
-more than another unvalidated signature would have been.
 
 ### Limitations
 - Internal validation cannot rule out cohort-specific artifacts that an
