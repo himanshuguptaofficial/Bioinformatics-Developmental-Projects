@@ -28,13 +28,12 @@ with survival in univariate Cox models, then ranked by how often they were
 selected across 1000 bootstrap resamples.
 
 All five hazard ratios sit below 1, so higher expression is protective in every
-case. Four of the five are unnamed Ensembl loci with no assigned gene symbol,
-which is typical for lncRNAs as these are largely
+case. Four of the five are unnamed Ensembl loci with no assigned gene symbol; this is typical for lncRNAs as these are largely
 uncharacterised transcripts.
 
 ## Method
 1. Standardize the five lncRNAs (z-score) so the coefficients are comparable
-2. Multivariate Cox proportional hazards model, adjusted for age at diagnosis
+2. Multivariate Cox proportional hazards model adjusted for age at diagnosis
 3. Risk score = the partial hazard predicted by the model
 4. Split the cohort at the median risk score
 5. Log-rank test between the high- and low-risk groups
@@ -57,25 +56,14 @@ period.
 | Median OS, low risk | 1877 days (~5.1 years) | — |
 
 Median survival differs by roughly 720 days in the apparent analysis, about
-two years. But the right-hand column is the important one: when the entire
+two years. But the right-hand column displays that when the entire
 selection pipeline is re-run inside cross-validation folds so that no patient
-is scored by a model that has seen their outcome, the performance collapses
-to chance. The apparent numbers are what this construction produces; project
-05 measures how much of it is real, and the answer is essentially none.
+is scored by a model that has seen their outcome, the performance dratically decreases. 
+The apparent numbers are what this construction produces; project
+05 measures how much of it is valid / experimentally relevant.
 
 Age went into the model as a covariate and was not significant (HR 1.011 per
-year, p = 0.197), so the separation is not an age artifact.
-
-### Why the contrast with project 01 is instructive
-Taken one at a time these lncRNAs are unremarkable and one of the five
-(ENSG00000241912) is not even significant on its own at p = 0.172. Put
-together, they reach p = 1.2 × 10⁻⁹. When this analysis was first written,
-that contrast read as "the signal is real but distributed, and only a
-composite recovers it." [Project 05](../05-honest-validation) shows the
-correct reading is less flattering: a pipeline that screens 12,290 lncRNAs
-on 216 patients can assemble a composite this impressive from noise, and the
-p-value mostly measures the flexibility of the selection procedure rather
-than biology. Project 01's null was the truthful result all along.
+year, p = 0.197) so the separation is not an age artifact.
 
 ### Limitations
 - This is not out-of-sample performance. The signature was selected on this
