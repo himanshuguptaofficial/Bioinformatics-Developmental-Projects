@@ -21,17 +21,17 @@ TCGA-OV RNA-seq, restricted to the 216 confirmed HGSOC primary tumours that
 have a definitive platinum status. The filtering cascade is further described in
 `prepare_data.py` at the repository root.
 
-Only the two extremes are compared, 67 resistant against 94 sensitive. The 55
-partially sensitive patients (PFI 6–12 months) sit between the groups, and
+Only the two extremes are compared (67 resistant against 94 sensitive). The 55
+partially sensitive patients (PFI 6–12 months) sit between the groups and
 including them blurs the contrast (for this reason, they were filtered out for this analysis).
 
 ## Method
-1. log2(TPM+1) normalization, low-expression genes dropped
-2. lncRNA selection from the GENCODE v44 annotation, leaving 12,290 lncRNAs
-3. Mann-Whitney U test per lncRNA, resistant against sensitive
+1. log2(TPM+1) normalization (low-expression genes dropped)
+2. lncRNA selection from the GENCODE v44 annotation (12,290 lncRNAs left after filtering)
+3. Mann-Whitney U test per lncRNA (resistant against sensitive)
 4. Benjamini-Hochberg FDR correction across all 12,290 tests
 
-Mann-Whitney rather than a t-test, because log-transformed expression is still
+Mann-Whitney rather than a t-test because log-transformed expression is still
 visibly non-normal and the two groups are different sizes.
 
 ## Results
@@ -43,8 +43,7 @@ The skew towards downregulation is significant; resistance tracks
 with loss of lncRNA expression more than with gain.
 
 Nothing survives FDR correction. The smallest adjusted p-value is 0.326;
-the volcano plot indicates why: it is a broad cloud of modest effects rather than a
-few dominant hits, with most effect sizes under 0.6 log2 units.
+the volcano plot indicates why: it is a broad cloud of effects with most effect sizes under 0.6 log2 units.
 
 The strongest individual candidates:
 
@@ -60,13 +59,11 @@ The strongest individual candidates:
 Failing FDR at n = 161 is expected and it lines up
 with what other published TCGA-OV lncRNA studies report. Correcting 12,290
 tests demands large individual effects, and lncRNAs are expressed at low
-absolute levels with high variance between patients. The conclusion to draw is
-narrow: no single lncRNA works as a standalone biomarker of platinum resistance
-at this cohort size.
+absolute levels with high variance between patients. The conclusion: no single lncRNA works as a standalone biomarker of platinum resistance at this cohort size.
 
-So the 554 candidates are a screening stage rather than a result.
+The 554 resulting candidates are a screening stage and do not provide individual meaningful results. For this reason, survival risk scores were carried out (check project 2) and externally validated (check project 5).
 [Project 02](../02-survival-risk-score) carries them forward into a composite
-score with a spectacular apparent p-value — and
+score with a promising apparent p-value and
 [project 05](../05-honest-validation) then shows that apparent performance is
 almost entirely selection optimism. In hindsight the null reported here was
 the truthful reading of this cohort: at raw p < 0.05 with 12,290 tests,
