@@ -5,7 +5,7 @@ Projects [02](../02-survival-risk-score) and [03](../03-time-dependent-roc)
 report an apparent survival association for the 5-lncRNA signature
 ([project 05](../05-honest-validation) tests how much of it is real). Whatever
 its prognostic value, the five lncRNAs are real transcripts with real
-co-expression partners. What is the specific biological context they sit in?
+co-expression partners. What is the specific biological context that these lncRNAs are predominantly involved in?
 
 ## Background
 lncRNAs are hard to interpret directly. They have no reading frame, and four of
@@ -25,8 +25,7 @@ regulation, shared cell-type composition, or genuine regulatory relationship.
    2021 via Enrichr
 
 Spearman is computed as Pearson correlation on ranks through a single matrix
-product, which is equivalent to looping over ~18.5k genes five times and much
-faster. Protein-coding status comes from GENCODE rather than being inferred as
+product. Protein-coding status comes from GENCODE rather than being inferred as
 "not a lncRNA", so pseudogenes and other biotypes are properly excluded.
 
 At n = 216, |rho| ≥ 0.3 already corresponds to p ≈ 7 × 10⁻⁶, so the correlation
@@ -66,12 +65,12 @@ resistance.
 
 ### Interpretation
 This points at the tumour immune microenvironment rather than a cell-intrinsic
-resistance mechanism. That is biologically coherent, since immune infiltration
+resistance mechanism. That is biologically coherent since immune infiltration
 is an established prognostic factor in HGSOC. It is also consistent with the
-validation result in [project 05](../05-honest-validation): a signature whose
-co-expression neighbourhood is dominated by immune context rather than
-chemoresistance biology has no particular reason to generalize as a platinum
-resistance predictor, and out-of-fold it does not.
+validation result in [project 05](../05-honest-validation): A signature whose 
+co-expression profile is dominated by immune-related signals has little biological 
+basis for generalizing as a predictor of platinum resistance. Consistent with 
+this, it fails to predict resistance in out-of-fold validation.
 
 One caveat follows directly from that. Bulk RNA-seq cannot separate expression
 in tumour cells from expression in infiltrating immune cells, so an immune
