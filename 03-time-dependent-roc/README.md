@@ -6,26 +6,25 @@ separates survival curves. Does the signature add anything biologically relevant
 
 ## Background
 A biomarker that only recapitulates known clinical variables is not clinically
-useful, however small its p-value. The honest test is a head-to-head comparison
-against the existing standard of care, run on the same patients.
+useful. The honest test is a head-to-head comparison
+against the existing standard of care run on the same patients.
 
 Survival prediction is also time-dependent. The
 comparison is made separately at 1, 3 and 5 years to determine the relevance of the biomarker at different time-intervals.
 
 ## Method
-1. Refit the project 02 Cox model to get risk scores, so this project stands
-   alone
+1. Refit the project 02 Cox model to get risk scores
 2. Encode FIGO stage on an ordinal scale, collapsing substages (IIIA/IIIB/IIIC
    all map to 3)
 3. At each horizon, label patients dead or alive
 4. Compute ROC and AUC for each of the three predictors
 
 Patients censored before a horizon are excluded at that horizon. Their status
-there is genuinely unknown, and assuming either outcome would bias the result.
+there is  unknown so assuming either outcome would bias the result.
 
 All three predictors are evaluated on the same complete-case cohort of 128
-patients with 79 deaths, since comparing AUCs computed on different subsets
-would not mean much. FIGO stage is the limiting variable (missing for 88 of the
+patients with 79 deaths (comparing AUCs computed on different subsets
+is meaningless in this contex). FIGO stage is the limiting variable (missing for 88 of the
 216 patients).
 
 ## Results
@@ -38,22 +37,16 @@ would not mean much. FIGO stage is the limiting variable (missing for 88 of the
 | Age at diagnosis | 0.782 | 0.615 | 0.480 |
 | FIGO stage | 0.464 | 0.519 | 0.471 |
 
-The signature comes out ahead of both clinical variables at every horizon —
-but this comparison is rigged in the signature's favour, and the rigging turns
-out to account for the entire result. The signature was selected on these
+The signature comes out ahead of both clinical variables at 1, 3, and 5 years. The signature was selected on these
 patients while age and FIGO stage were not, so its AUCs carry selection
-optimism theirs cannot. [Project 05](../05-honest-validation) measures that
-optimism directly: scored out-of-fold, the signature's overall discrimination
-drops to chance (C-index 0.517, permutation p = 0.33). The honest conclusion
-is not "the signature beats the clinic," it is "a signature fit to this cohort
-can be made to look like it beats the clinic," which is a caution about this
-very common comparison rather than a finding about lncRNAs.
+optimism that the other factors do not have. [Project 05](../05-honest-validation) measures this
+ directly. 
 
 ### The 1-year panel should not be trusted
 An AUC of 0.927 is an extremely promising result. However, it means very little here, because only 2
 patients died within the first year among the 126 evaluable. 
 
-The 3-year and 5-year panels, with 32 and 60 deaths, are substantive
+The 3-year and 5-year panels, with 32 and 60 deaths are apparent substantive
 results.
 
 ### Why FIGO stage does so badly
